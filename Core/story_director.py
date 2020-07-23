@@ -7,6 +7,12 @@ def RepresentsFloat(s):
         return True
     except ValueError:
         return False
+def RepresentsInt(s):
+    try: 
+        int(s)
+        return True
+    except ValueError:
+        return False
 # ---------------------------------------------------------------------------- #
 #                                    Tokens                                    #
 # ---------------------------------------------------------------------------- #
@@ -39,7 +45,7 @@ TT_int='TT_int'
 # [EDIT]
 TT_type='TT_type'
 #  1) Dialogue 2) Descriptive 3) Tutorials 4) Audio Book
-TT_type='TT_style'
+TT_style='TT_style'
 #  1) Cartoon (modify search query) 2) Drama (stylize but real humans) 3) Preserve (for testing and for tutorials) 
 
 # ------------------------------ Character Data ------------------------------ #
@@ -65,16 +71,32 @@ TT_layer='TT_layer' # frames consist of multiple layers (eg. character describin
 TT_lpos='TT_lpos'   # position of a layer in a frame
 TT_ldurr='TT_ldur'  # duration for which layer stays in ms
 
+TT_tokens=["esc","compile","add","process","del","edit","type","style","cast","traits","face","voice","scene","bg","choice","frame","emotions","layer","lpos","ldur"]
 
 class Token:
-    def __init__(self,type_,value):
-        self.type = type
+    def __init__(self,type_,value=None):
+        self.type = type_
         self.value = value
     
     def __repr__(self):
-        if self.value: return f'{self.type}:{self:value}'
+        if self.value: return f'{self.type}:{self.value}'
         return f'{self.type}'
 
+# ---------------------------------------------------------------------------- #
+#                                     Error                                    #
+# ---------------------------------------------------------------------------- #
+
+class Error:
+    def __init__(self,error_name,details):
+        self.error_name=error_name
+        self.details=details
+    def __str__(self):
+        return 'Error('+str(self.error_name)+' : '+str(self.details)+ ')' 
+
+class IllegalParamError(Error):
+    def __init__(self,details):
+        super().__init__('Illegal Parameter specified',details)
+        
 # ---------------------------------------------------------------------------- #
 #                                     Lexer                                    #
 # ---------------------------------------------------------------------------- #
@@ -88,23 +110,40 @@ class Lexer:
     
     def advance(self):
         self.pos+=1
-        self.current_word=self.text[pos] if self.pos < len(self.text) else None
+        self.current_word=self.text[self.pos] if self.pos < len(self.text) else None
     
     def make_tokens(self):
-        token=[]
+        tokens=[]
         while self.current_word != None:
-            if( globals()[self.current_word]):
-                tokens.append(Token(TT_add))
+            if( self.current_word in TT_tokens):
+                tokens.append(Token("TT_"+self.current_word))
                 self.advance()
-        return tokens
+            elif RepresentsFloat(self.current_word) or RepresentsInt(self.current_word):
+                tokens.append(self.make_number())
+            else:
+                unknown = self.current_word 
+                self.advance()
+                return [],IllegalParamError("'"+unknown+"'")
+        return tokens, None
     
     def make_number(self):
         dot_count=0
         number=self.current_word
-        if RepresentsFloat(number):
-            if (number).count('.')==1:
-                return Token(TT_float)
-            elif number[0]=='-':
-                return Token(TT_nInt)
-            else:
-                return Token(TT_int) 
+        self.advance()
+        if (number).count('.')==1:
+            return Token(TT_float,float(number))
+        elif number[0]=='-':
+            return Token(TT_nInt,int(number))
+        else:
+            return Token(TT_int,int(number))
+
+# ---------------------------------------------------------------------------- #
+#                                      Run                                     #
+# ---------------------------------------------------------------------------- #
+
+def run(text):
+    lexer = Lexer(text)
+    tokens,error = lexer.make_tokens()
+    
+    return tokens,error
+
