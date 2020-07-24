@@ -34,6 +34,7 @@ Commands=['esc','compile']
 TT_float='TT_float'
 TT_nInt='TT_nInt'
 TT_int='TT_int'
+TT_cmdVar='TT_cmdVar'
 # TT_str all other indetifiers replace string to specific contexts
 
 # [TODO] All of the following are identifiers ||** need to be declared
@@ -71,7 +72,9 @@ TT_layer='TT_layer' # frames consist of multiple layers (eg. character describin
 TT_lpos='TT_lpos'   # position of a layer in a frame
 TT_ldurr='TT_ldur'  # duration for which layer stays in ms
 
-TT_tokens=["esc","compile","add","process","del","edit","type","style","cast","traits","face","voice","scene","bg","choice","frame","emotions","layer","lpos","ldur"]
+TT_cmd=["esc","compile","add","process","del","edit"]
+TT_identifiers=["type","style","cast","traits","face","voice","scene","bg","choice","frame","emotions","layer","lpos","ldur"]
+TT_tokens=TT_cmd+TT_identifiers
 
 class Token:
     def __init__(self,type_,value=None):
@@ -83,49 +86,97 @@ class Token:
         return f'{self.type}'
 
 # ---------------------------------------------------------------------------- #
+#                                 Error Details                                #
+# ---------------------------------------------------------------------------- #
+
+class Position:
+    def __init__(self,idx,ln,col,fn,ftxt):
+        self.idx=idx
+        self.ln=ln
+        self.col=col
+        self.fn=fn
+        self.ftxt=ftxt
+    
+    def advance(self):
+        self.idx += 1
+        self.col += 1
+        
+        if self.idx ==  0:
+            self.ln+=1
+            self.col=0
+        
+        return self
+    
+    def copy(self):
+        return Position(self.idx,self.ln,self.col,self.fn,self.ftxt)
+
+# ---------------------------------------------------------------------------- #
 #                                     Error                                    #
 # ---------------------------------------------------------------------------- #
 
 class Error:
-    def __init__(self,error_name,details):
+    def __init__(self,pos_e,error_name,details):
+        self.pos_e=pos_e
         self.error_name=error_name
         self.details=details
     def __str__(self):
-        return 'Error('+str(self.error_name)+' : '+str(self.details)+ ')' 
+        result = ''+str(self.error_name)+' : '+str(self.details)+ ' '
+        result += f'[ File {self.pos_e.fn}, Line {self.pos_e.ln},Pos: {self.pos_e.col+1} ]'
+        return result
 
 class IllegalParamError(Error):
-    def __init__(self,details):
-        super().__init__('Illegal Parameter specified',details)
+    def __init__(self,pos_e,details):
+        super().__init__(pos_e,'Illegal Parameter specified',details)
         
 # ---------------------------------------------------------------------------- #
 #                                     Lexer                                    #
 # ---------------------------------------------------------------------------- #
 
 class Lexer:
-    def __init__(self,text):
+    def __init__(self,fn,text):
+        self.fn=fn
         self.text=text.split()
-        self.pos=-1
+        self.pos=Position(-1,0,-1,fn,text)
         self.current_word=None
         self.advance()
     
     def advance(self):
-        self.pos+=1
-        self.current_word=self.text[self.pos] if self.pos < len(self.text) else None
+        self.pos.advance()
+        self.current_word=self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
+    
+    def fin(self):
+        self.pos.idx= len(self.text)
+        self.advance()
     
     def make_tokens(self):
         tokens=[]
         while self.current_word != None:
-            if( self.current_word in TT_tokens):
-                tokens.append(Token("TT_"+self.current_word))
-                self.advance()
-            elif RepresentsFloat(self.current_word) or RepresentsInt(self.current_word):
+            if RepresentsFloat(self.current_word) or RepresentsInt(self.current_word):
                 tokens.append(self.make_number())
+            elif self.current_word in TT_tokens:
+                tokens.append(Token("TT_"+self.current_word))
+                if self.current_word in TT_identifiers:
+                    self.advance()
+                    if self.current_word != None:
+                        if RepresentsFloat(self.current_word) or RepresentsInt(self.current_word):
+                            tokens.append(self.make_number())
+                        else:
+                            tokens.append(self.make_cmdVar())
+                else:                
+                    self.advance()
             else:
+                pos_e=self.pos.copy()
                 unknown = self.current_word 
                 self.advance()
-                return [],IllegalParamError("'"+unknown+"'")
+                return [],IllegalParamError(pos_e,"'"+unknown+"'")
         return tokens, None
     
+    def make_cmdVar(self):
+        cmdVar=self.text[self.pos.idx:]
+        cmdVar=" ".join(cmdVar) 
+        self.fin()
+        print(Token(TT_cmdVar,f'{cmdVar}'))
+        return Token(TT_cmdVar,f'{cmdVar}')
     def make_number(self):
         dot_count=0
         number=self.current_word
@@ -138,11 +189,29 @@ class Lexer:
             return Token(TT_int,int(number))
 
 # ---------------------------------------------------------------------------- #
+#                                    _nodes_                                   #
+# ---------------------------------------------------------------------------- #
+class CmdVar:
+    def __init__(self,tok):
+        self.tok=tok
+    def __repr__(self):
+        return f'{self.tok}'
+
+class OperationNode:
+    def __init__(self,left_node,op_token,right_node):
+        self.left_node = left_node
+        self.op_token = op_token
+        self.right_node = right_node
+    
+    def __repr__(self):
+        return f'[{self.left_node},{self.op_token},{self.right_node}]'
+
+# ---------------------------------------------------------------------------- #
 #                                      Run                                     #
 # ---------------------------------------------------------------------------- #
 
-def run(text):
-    lexer = Lexer(text)
+def run(fn,text):
+    lexer = Lexer(fn, text)
     tokens,error = lexer.make_tokens()
     
     return tokens,error

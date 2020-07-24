@@ -10,6 +10,6 @@ class bcolors:
     UNDERLINE = '\033[4m'
 while True:
     text = input('director > ')
-    result,error = sd.run(text)
+    result,error = sd.run("<Input>",text)
     if error: print(f"{bcolors.WARNING}{error.__str__()}{bcolors.ENDC}")
-    else: print(result)
+    else: print(f"{bcolors.OKBLUE}{result}{bcolors.ENDC}")
