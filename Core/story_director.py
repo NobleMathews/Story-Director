@@ -31,10 +31,10 @@ Commands=['esc','compile']
 
 # ------------------------------ Variable types ------------------------------ #
 #  number types for indexes and traversal ||** auto indentified
-TT_float='TT_float'
-TT_nInt='TT_nInt'
-TT_int='TT_int'
 TT_cmdVar='TT_cmdVar'
+TT_cmdFloat='TT_cmdFloat'
+TT_cmdIntN='TT_cmdIntN'
+TT_cmdInt='TT_cmdInt'
 # TT_str all other indetifiers replace string to specific contexts
 
 # [TODO] All of the following are identifiers ||** need to be declared
@@ -182,11 +182,11 @@ class Lexer:
         number=self.current_word
         self.advance()
         if (number).count('.')==1:
-            return Token(TT_float,float(number))
+            return Token(TT_cmdFloat,float(number))
         elif number[0]=='-':
-            return Token(TT_nInt,int(number))
+            return Token(TT_cmdIntN,int(number))
         else:
-            return Token(TT_int,int(number))
+            return Token(TT_cmdInt,int(number))
 
 # ---------------------------------------------------------------------------- #
 #                                    _nodes_                                   #
@@ -205,6 +205,23 @@ class OperationNode:
     
     def __repr__(self):
         return f'[{self.left_node},{self.op_token},{self.right_node}]'
+
+# ---------------------------------------------------------------------------- #
+#                                    Parser                                    #
+# ---------------------------------------------------------------------------- #
+
+class Parser:
+    def __init__(self,tokens):
+        self.tokens=tokens
+        self.tok_idx=-1
+        self.advance()
+        
+    def advance(self):
+        self.tok_idx+=1
+        if self.tok_idx < len(self.tokens):
+            self.current_tok = self.tokens[self.tok_idx]
+        return self.current_tok
+        
 
 # ---------------------------------------------------------------------------- #
 #                                      Run                                     #
