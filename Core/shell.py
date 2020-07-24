@@ -11,5 +11,5 @@ class bcolors:
 while True:
     text = input('director > ')
     result,error = sd.run("<Input>",text)
-    if error: print(f"{bcolors.WARNING}{error.__str__()}{bcolors.ENDC}")
+    if error: print(f"{bcolors.WARNING}{error.as_string()}{bcolors.ENDC}")
     else: print(f"{bcolors.OKBLUE}{result}{bcolors.ENDC}")

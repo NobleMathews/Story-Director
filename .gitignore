@@ -1,3 +1,3 @@
 .vs
 .idea
-Core/__pycache__
+*__pycache__
